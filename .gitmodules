@@ -1,0 +1,3 @@
+[submodule "submodules/highway"]
+	path = submodules/highway
+	url = https://github.com/google/highway.git
