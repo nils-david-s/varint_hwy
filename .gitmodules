@@ -4,3 +4,6 @@
 [submodule "submodules/varint_rvv"]
 	path = submodules/varint_rvv
 	url = https://github.com/vogma/varint_rvv.git
+[submodule "submodules/google-benchmark"]
+	path = submodules/google-benchmark
+	url = https://github.com/google/benchmark.git
