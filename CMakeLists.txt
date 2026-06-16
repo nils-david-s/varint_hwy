@@ -3,16 +3,22 @@ project(varinthwy VERSION 0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
-set(BUILD_TEST CACHE BOOL OFF)
+option(BUILD_TEST "Build test" OFF)
 
 add_compile_options(
-    -march=rv64gcv_zba_zbb_zbc_zbs_zkt_zfh_zcd_zca 
-    -mabi=lp64d 
     -O3 
     -static 
     -Wall 
     -Werror
 )
+
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
+    add_compile_options(
+        -march=rv64gcv_zba_zbb_zbc_zbs_zkt_zfh_zcd_zca
+        -mabi=lp64d
+    )
+endif()
+
 
 add_subdirectory(submodules/varint_rvv)
 

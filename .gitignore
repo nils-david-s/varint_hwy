@@ -1,2 +1,4 @@
-build
-riscv-toolchain.cmake
+out
+toolchain-riscv.cmake
+toolchain-x86_64.cmake
+toolchain-arm.cmake
