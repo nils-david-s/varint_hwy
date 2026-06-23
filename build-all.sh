@@ -17,5 +17,5 @@ build() {
 }
 
 build riscv toolchain-riscv.cmake
-#build x86_64 toolchain-x86_64.cmake
+build x86_64 toolchain-x86_64.cmake
 #build arm toolchain-arm.cmake

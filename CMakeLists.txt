@@ -20,7 +20,7 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
 endif()
 
 
-add_subdirectory(submodules/varint_rvv)
+#add_subdirectory(submodules/varint_rvv)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/lib/include
