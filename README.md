@@ -1,4 +1,5 @@
-To build the project a toolchain file per target is needed.
+To build the project a toolchain file per target is needed in the project root directory.
+(toolchain-riscv.cmake, toolchain-arm.cmake, toolchain-x86_64.cmake)
 
 Example for riscv:
 set(CMAKE_SYSTEM_NAME Linux)
