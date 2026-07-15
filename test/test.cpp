@@ -127,7 +127,11 @@ int main(void) {
 
     // Decode using varint_decode_hwy
 
+    #if defined(DECODE_IMPL_HIGHWAY)
     call_varint_decode_hwy(encoded_data, encoded_length, decoded_data);
+    #elif defined(DECODE_IMPL_ARM_SVE_INTRINSIC)
+    varint_decode_arm(encoded_data, encoded_length, decoded_data);
+    #endif
     printf("Decoded %zu bytes\n\n", encoded_length);
 
     // Validate
