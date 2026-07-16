@@ -20,11 +20,6 @@ void varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
         uint64_t num_varints = svcntp_b8(vl_pred, termination_mask);
 
         if (num_varints == vl) {
-            //printf("in 1Byte case with num_varints: %zu\n", num_varints);
-            //printf("Storemask 0: %zu\n", vl_0);
-            //printf("Storemask 1: %zu\n", vl_1);
-            //printf("Storemask 2: %zu\n", vl_2);
-            //printf("Storemask 3: %zu\n", vl_3);
             // widen uint8 to uint32 and store 
             svst1_u32(vl_pred_u32_0, output         , svunpklo_u32(svunpklo_u16(input)));
             svst1_u32(vl_pred_u32_1, output + 1*N8/4, svunpkhi_u32(svunpklo_u16(input)));
@@ -47,9 +42,7 @@ void varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
             svuint8_t input_2d = svext_u8(input, svdup_u8(0), 2);
 
             // every byte after a termination byte is a first byte
-            // TODO: Maybe svext with vl-1 (wrapping)
-            uint8_t idata[] = {255,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-            svuint8_t input_1u = svtbl_u8(input, svld1_u8(svptrue_b8(), idata));
+            svuint8_t input_1u = svinsr_n_u8(input, 0);
             svbool_t mask_first_bytes = svcmple_n_u8(vl_pred, input_1u, 0x7F);
             
             // SVE: Compression is expensive for u8, only u32 and u64 have a
