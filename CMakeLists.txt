@@ -30,7 +30,7 @@ endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     add_compile_options(
-        -march=armv8-a+sve2 -g
+        -march=armv8-a+sve2
     )
 endif()
 
@@ -47,16 +47,16 @@ set(VARINT_HWY_CPP ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy.cpp)
 set(VARINT_ARM_SVE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_sve.c)
 set(TEST_CPP ${CMAKE_SOURCE_DIR}/test/test.cpp)
 
-add_library(varinthwy STATIC ${VARINT_HWY_CPP})
 
 if(BUILD_TEST)
     if(DECODE_IMPL STREQUAL "HIGHWAY")
+        add_library(varinthwy STATIC ${VARINT_HWY_CPP})
         add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_C} ${VARINT_HWY_CPP})
         target_link_libraries(test_varint_hwy varinthwy -static)
     elseif(DECODE_IMPL STREQUAL "ARM_SVE_INTRINSIC")
         add_library(varintarmsve STATIC ${VARINT_ARM_SVE})
-        add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_C} ${VARINT_HWY_CPP} ${VARINT_ARM_SVE})
-        target_link_libraries(test_varint_hwy varinthwy varintarmsve -static)
+        add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_C} ${VARINT_ARM_SVE})
+        target_link_libraries(test_varint_hwy varintarmsve -static)
     endif()
     target_include_directories(
         test_varint_hwy PRIVATE
