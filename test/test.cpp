@@ -81,10 +81,11 @@ int main(void) {
     const int weights[5] = {85, 5, 4, 3, 3};
 
     uint8_t *encoded_data = (uint8_t*) malloc(N * 5);
-    uint32_t *decoded_data = (uint32_t*) malloc(N * sizeof(uint32_t));
+    uint32_t *decoded_data_portable = (uint32_t*) malloc(N * sizeof(uint32_t));
+    uint32_t *decoded_data_specific = (uint32_t*) malloc(N * sizeof(uint32_t));
     uint32_t *original_data = (uint32_t*) malloc(N * sizeof(uint32_t));
-    size_t decoded_count;
-    if (!original_data | !decoded_data | !encoded_data) {
+    size_t decoded_count_portable;
+    if (!original_data | !decoded_data_portable | !decoded_data_specific | !encoded_data) {
         fprintf(stderr, "Failed to allocate memory\n");
         return 1;
     }
@@ -126,33 +127,57 @@ int main(void) {
     }
     printf("\n");
 
-    // Decode using varint_decode_hwy
-
-    #if defined(DECODE_IMPL_HIGHWAY)
-    decoded_count = call_varint_decode_hwy(encoded_data, encoded_length, decoded_data);
-    #elif defined(DECODE_IMPL_ARM_SVE_INTRINSIC)
-    decoded_count = varint_decode_arm(encoded_data, encoded_length, decoded_data);
-    #endif
-    printf("Decoded %zu intergers from %zu bytes\n\n", decoded_count, encoded_length);
-
-    // Validate
-    int errors = 0;
+    // Decode using varint_decode_hwy_portable (available on all architectures)
+    decoded_count_portable = call_varint_decode_hwy_portable(encoded_data, encoded_length, decoded_data_portable);
+    printf("Portable: Decoded %zu intergers from %zu bytes\n\n", decoded_count_portable, encoded_length);
+    // Validate portable
+    int errors_portable = 0;
     for (size_t i = 0; i < N; ++i) {
-        if (original_data[i] != decoded_data[i]) {
-            printf("ERROR at index %zu: expected: %u, got %u\n", i, original_data[i], decoded_data[i]);
-            errors++;
-            if (errors >= 10) {
-                printf("... stopping after 10 erors)\n");
+        if (original_data[i] != decoded_data_portable[i]) {
+            printf("Portable: ERROR at index %zu: expected: %u, got %u\n", i, original_data[i], decoded_data_portable[i]);
+            errors_portable++;
+            if (errors_portable >= 10) {
+                printf("Portable: ... stopping after 10 erors)\n");
                 break;
             }
         }
     }
-    if (errors == 0) {
-        printf("SUCCESS: All %zu values decoded correctly\n", N);
+    if (errors_portable == 0) {
+        printf("Portable: SUCCESS: All %zu values decoded correctly\n", N);
     } else {
-        printf("Failed: %d errors found\n", errors);
+        printf("Portable: Failed: %d errors found\n", errors_portable);
     }
-    return errors > 0 ? 1 : 0;
+    
+    // Decode using varint_decode_hwy_riscv or arm_sve implementation
+    #if defined(RISCV)
+    size_t decoded_count_specific;
+    decoded_count_specific = call_varint_decode_hwy_riscv(encoded_data, encoded_length, decoded_data_specific);
+    printf("\n\nSpecific(RISCV): Decoded %zu intergers from %zu bytes\n\n", decoded_count_specific, encoded_length);
+    #elif defined(SVE2)
+    size_t decoded_count_specific;
+    decoded_count_specific = varint_decode_arm(encoded_data, encoded_length, decoded_data_specific);
+    printf("\n\nSpecific(SVE2): Decoded %zu intergers from %zu bytes\n\n", decoded_count_specific, encoded_length);
+    #endif
+    // Validate varint_decode_hwy_riscv or arm_sve
+    #if defined(RISCV) || defined(SVE2) 
+    int errors_specific = 0;
+    for (size_t i = 0; i < N; ++i) {
+        if (original_data[i] != decoded_data_specific[i]) {
+            printf("RISCV/SVE2: ERROR at index %zu: expected: %u, got %u\n", i, original_data[i], decoded_data_specific[i]);
+            errors_specific++;
+            if (errors_specific >= 10) {
+                printf("RISCV/SVE2: ... stopping after 10 erors)\n");
+                break;
+            }
+        }
+    }
+    if (errors_specific == 0) {
+        printf("RISCV/SVE2: SUCCESS: All %zu values decoded correctly\n", N);
+    } else {
+        printf("RISCV/SVE2: Failed: %d errors found\n", errors_specific);
+    }
+    return errors_portable + errors_specific > 0 ? 1 : 0;
+    #endif
 }
 #endif // HWY_ONCE
 
