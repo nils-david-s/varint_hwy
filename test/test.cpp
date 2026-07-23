@@ -83,6 +83,7 @@ int main(void) {
     uint8_t *encoded_data = (uint8_t*) malloc(N * 5);
     uint32_t *decoded_data = (uint32_t*) malloc(N * sizeof(uint32_t));
     uint32_t *original_data = (uint32_t*) malloc(N * sizeof(uint32_t));
+    size_t decoded_count;
     if (!original_data | !decoded_data | !encoded_data) {
         fprintf(stderr, "Failed to allocate memory\n");
         return 1;
@@ -128,11 +129,11 @@ int main(void) {
     // Decode using varint_decode_hwy
 
     #if defined(DECODE_IMPL_HIGHWAY)
-    call_varint_decode_hwy(encoded_data, encoded_length, decoded_data);
+    decoded_count = call_varint_decode_hwy(encoded_data, encoded_length, decoded_data);
     #elif defined(DECODE_IMPL_ARM_SVE_INTRINSIC)
-    varint_decode_arm(encoded_data, encoded_length, decoded_data);
+    decoded_count = varint_decode_arm(encoded_data, encoded_length, decoded_data);
     #endif
-    printf("Decoded %zu bytes\n\n", encoded_length);
+    printf("Decoded %zu intergers from %zu bytes\n\n", decoded_count, encoded_length);
 
     // Validate
     int errors = 0;

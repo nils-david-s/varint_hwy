@@ -2,8 +2,9 @@
 #include <arm_sve.h>
 #include <stdio.h>
 
-void varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
+size_t varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
     const uint64_t N8 = svcntb();
+    size_t processed = 0;
     while(length > 0) {
         svbool_t vl_pred = svwhilelt_b8_u32(0, length); 
         uint64_t vl = svcntp_b8(vl_pred,vl_pred);
@@ -29,6 +30,7 @@ void varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
             output += num_varints;
             length -= vl;
             data +=  vl;
+            processed += num_varints;
         }
         else {
             // predicate to limit to num_varints lanes
@@ -190,7 +192,8 @@ void varint_decode_arm(const uint8_t *data, size_t length, uint32_t *output) {
             }
             length -= number_of_bytes;
             data   += number_of_bytes;
+            processed += num_varints;
         }
-
     }
+    return processed;
 }

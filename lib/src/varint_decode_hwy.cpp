@@ -46,7 +46,7 @@ hn::Vec<hn::ScalableTag<uint32_t, 2>> WidenMulAcc(
 
 
 
-void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
+size_t varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
     using D8  = hn::ScalableTag<uint8_t>;
     const D8 d8;
     using V8  = hn::Vec<D8>;
@@ -61,6 +61,8 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
     const D32M4 d32;
     using V32M4 = hn::Vec<D32M4>;
     using M32M4 = hn::Mask<D32M4>;
+
+    size_t processed = 0;
 
     V8 thresh = hn::Set(d8, static_cast<uint8_t>(0x7F));
     // number of currently active lanes
@@ -84,6 +86,7 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
             output += num_varints;
             length -= num_varints;
             input  += num_varints;
+            processed += num_varints;
         }
         else {
             M8 mask_first_num_varints_8 = hn::FirstN(d8, num_varints);
@@ -174,9 +177,10 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
             }
             length -= number_of_bytes;
             input += number_of_bytes;
+            processed += num_varints;
         }
     } // while
-
+    return processed;
 }
 
 #endif // HWY_TARGET == HWY_RVV
@@ -238,7 +242,7 @@ hn::Vec<hn::ScalableTag<uint32_t>> WidenMulAccTo32 (
     return hn::MaskedMulAddOr(sum0, mask32_lo, a32_lo, b32_lo, sum0);
 }
     
-void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
+size_t varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
     using D8  = hn::ScalableTag<uint8_t>;
     const D8 d8;
     using V8  = hn::Vec<D8>;
@@ -259,6 +263,7 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
     using V32 = hn::Vec<D32>;
     using M32 = hn::Mask<D32>;
 
+    size_t processed = 0;
 
     V8 thresh = hn::Set(d8, static_cast<uint8_t>(0x7F));
     // number of lanes
@@ -287,6 +292,7 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
             output += num_varints;
             length -= N8;
             input  += N8;
+            processed += num_varints;
         }
         else {
             M8 mask_first_num_varints_8 = hn::FirstN(d8, num_varints);
@@ -453,6 +459,7 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
             }
             length -= number_of_bytes;
             input  += number_of_bytes;
+            processed += num_varints;
         }
     } // while length >= N8
     // tail handling
@@ -472,7 +479,9 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
         }
         *output = result;
         ++output;
+        ++processed;
     }
+    return processed;
 }
 #endif // HWY_TARGET != HWY_RVV
 
@@ -480,7 +489,7 @@ void varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_
 HWY_AFTER_NAMESPACE();
 
 extern "C" {
-    void call_varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
+    size_t call_varint_decode_hwy(const uint8_t* HWY_RESTRICT input, size_t length, uint32_t* HWY_RESTRICT output) {
         return HWY_STATIC_DISPATCH(varint_decode_hwy)(input, length, output);
     }
 }
