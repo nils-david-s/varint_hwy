@@ -137,27 +137,35 @@ static void BM(benchmark::State &state) {
     size_t total_ints = 0;
     uint64_t total_instructions = 0;
     uint64_t total_cycles = 0;
-    uint64_t total_cache_misses = 0;
     uint64_t total_branches = 0;
     uint64_t total_branch_misses = 0;
     uint64_t total_stalled_frontend = 0;
     uint64_t total_stalled_backend = 0;
+    uint64_t total_cache_misses_l1i = 0;
 
+    // How many perf counter are available on the hardware?
     PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
     PerfCounter cycle_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
-    PerfCounter cache_misses(PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES);
     PerfCounter branch_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS);
     PerfCounter branch_misses(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
     PerfCounter stalled_frontend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND);
     PerfCounter stalled_backend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND);
+    PerfCounter cache_misses_l1i(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I
+                                | (PERF_COUNT_HW_CACHE_OP_READ << 8)
+                                | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
+    // Did not experience backend stalls yet
+    //PerfCounter cache_misses_ll(PERF_TYPE_HW_CACHE, PERF_COUNT_HWCACHE_LL 
+    //                          | (PERF_COUNT_HW_CACHE_OP_READ << 8) 
+    //                          | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
+    
 
     insn_counter.start();
     cycle_counter.start();
-    cache_misses.start();
     branch_counter.start();
     branch_misses.start();
     stalled_frontend_counter.start();
     stalled_backend_counter.start();
+    cache_misses_l1i.start();
     for (auto _ : state) {
         size_t n = DecoderFn(ds.input.data(), ds.input.size(), ds.output.data());
         total_ints += n;
@@ -168,11 +176,11 @@ static void BM(benchmark::State &state) {
     }
     total_instructions = insn_counter.stop();
     total_cycles = cycle_counter.stop();
-    total_cache_misses = cache_misses.stop();
     total_branches = branch_counter.stop();
     total_branch_misses = branch_misses.stop();
     total_stalled_frontend = stalled_frontend_counter.stop();
     total_stalled_backend = stalled_backend_counter.stop();
+    total_cache_misses_l1i = cache_misses_l1i.stop();
 
     state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(ds.input.size()));
     // state.SetItemsProcessed(int64_t(total_ints));
@@ -184,8 +192,8 @@ static void BM(benchmark::State &state) {
         state.counters["insn/int"] = benchmark::Counter(
             double(total_instructions) / double(total_ints),
             benchmark::Counter::kAvgThreads);
-        state.counters["chachemissn/insn"] = benchmark::Counter(
-            double(total_cache_misses) / double(total_instructions),
+        state.counters["chachemissl1in/insn"] = benchmark::Counter(
+            double(total_cache_misses_l1i) / double(total_instructions),
             benchmark::Counter::kAvgThreads);
         state.counters["branchmissn/branchn"] = benchmark::Counter(
             double(total_branch_misses) / double(total_branches),
