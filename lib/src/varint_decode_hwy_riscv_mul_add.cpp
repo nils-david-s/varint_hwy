@@ -91,11 +91,11 @@ size_t varint_decode_hwy_riscv_mul_add(const uint8_t* HWY_RESTRICT input, size_t
         else {
             M8 mask_first_num_varints_8 = hn::FirstN(d8, num_varints);
 
-            V8 input_1d = hn::ShiftRightBytes<1>(d8, in);
-            V8 input_2d = hn::ShiftRightBytes<1>(d8, input_1d);
+            V8 input_1d = hn::Slide1Down(d8, in);
+            V8 input_2d = hn::Slide1Down(d8, input_1d);
 
             // every byte after a termination byte is as first byte
-            V8 input_1u = hn::ShiftLeftBytes<1>(d8, in);
+            V8 input_1u = hn::Slide1Up(d8, in);
             M8 mask_first_bytes = hn::Le(input_1u, thresh);
 
             // compress the slided input data vectors with the first_byte mask.
@@ -131,8 +131,8 @@ size_t varint_decode_hwy_riscv_mul_add(const uint8_t* HWY_RESTRICT input, size_t
                 output += num_varints;
             }
             else {
-            V8 input_3d = hn::ShiftRightBytes<1>(d8, input_2d);
-            V8 input_4d = hn::ShiftRightBytes<1>(d8, input_3d);
+            V8 input_3d = hn::Slide1Down(d8, input_2d);
+            V8 input_4d = hn::Slide1Down(d8, input_3d);
 
             V8 third_bytes  = hn::Compress(input_2d, mask_first_bytes);
             V8 fourth_bytes = hn::Compress(input_3d, mask_first_bytes);
