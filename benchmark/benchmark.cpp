@@ -18,6 +18,7 @@ extern "C" {
     size_t call_varint_decode_hwy_riscv(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_riscv_mul_add(const uint8_t *input, size_t length, uint32_t *output);
     size_t varint_decode_arm(const uint8_t *input, size_t length, uint32_t *output);
+    size_t varint_decode_arm_early_branch(const uint8_t *input, size_t length, uint32_t *output);
 }
 
 struct Dataset {
@@ -224,6 +225,7 @@ BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    95,  2, 1, 1, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
 BENCHMARK_TEMPLATE(BM, varint_decode_arm,               95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #endif
 
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
@@ -236,6 +238,7 @@ BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    90,  4, 3, 2, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
 BENCHMARK_TEMPLATE(BM, varint_decode_arm,               90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #endif
 
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
@@ -248,6 +251,7 @@ BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    81,  7, 6, 5, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
 BENCHMARK_TEMPLATE(BM, varint_decode_arm,               81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #endif
 
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
@@ -260,6 +264,7 @@ BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    72, 13, 9, 5, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
 BENCHMARK_TEMPLATE(BM, varint_decode_arm,               72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #endif
 
 BENCHMARK_MAIN();

@@ -15,6 +15,7 @@ extern "C"
     size_t call_varint_decode_hwy_riscv(const uint8_t *input, size_t length, uint32_t *output); 
     size_t varint_decode_vecshift(const uint8_t *input, size_t length, uint32_t *output);
     size_t varint_decode_arm(const uint8_t *input, size_t length, uint32_t *output);
+    size_t varint_decode_arm_early_branch(const uint8_t *input, size_t length, uint32_t *output);
 #ifdef __cplusplus
 }
 #endif
