@@ -15,8 +15,10 @@ extern "C" {
     size_t varint_decode_vecshift(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_portable(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_portable_nomask(const uint8_t *input, size_t length, uint32_t *output);
+    size_t call_varint_decode_hwy_portable_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_portable_early_branch(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_riscv(const uint8_t *input, size_t length, uint32_t *output);
+    size_t call_varint_decode_hwy_riscv_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_riscv_nomask(const uint8_t *input, size_t length, uint32_t *output);
     size_t call_varint_decode_hwy_riscv_mul_add(const uint8_t *input, size_t length, uint32_t *output);
     size_t varint_decode_arm(const uint8_t *input, size_t length, uint32_t *output);
@@ -220,11 +222,16 @@ static void BM(benchmark::State &state) {
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+<<<<<<< HEAD
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+=======
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+>>>>>>> 75be8c8 (added libary provided widenmulaccumulate version for riscv and portable)
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -236,10 +243,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            90,  4, 3, 2, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -251,10 +260,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            81,  7, 6, 5, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -266,10 +277,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            72, 13, 9, 5, 1)->RangeM
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -281,10 +294,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            100,0,0,0,0)->RangeMulti
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -296,10 +311,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,100,0,0,0)->RangeMulti
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -311,10 +328,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,100,0,0)->RangeMulti
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -326,10 +345,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,0,100,0)->RangeMulti
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -341,10 +362,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,0,0,100)->RangeMulti
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)
@@ -356,10 +379,12 @@ BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            20,20,20,20,20)->RangeMu
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #elif defined(SVE2)

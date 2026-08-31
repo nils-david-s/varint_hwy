@@ -46,8 +46,10 @@ set(VARINT_RVV_VECSHIFT_C ${CMAKE_SOURCE_DIR}/submodules/varint_rvv/lib/src/vari
 set(VARINT_RVV_SCALAR_TAIL_C ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_scalar_tail.c)
 set(VARINT_HWY_PORTABLE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable.cpp)
 set(VARINT_HWY_PORTABLE_NOMASK ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_nomask.cpp)
+set(VARINT_HWY_PORTABLE_WMACCLIB ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_wmacclib.cpp)
 set(VARINT_HWY_PORTABLE_EARLY_BRANCH ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_early_branch.cpp)
 set(VARINT_HWY_RISCV ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv.cpp)
+set(VARINT_HWY_RISCV_WMACCLIB ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_wmacclib.cpp)
 set(VARINT_HWY_RISCV_NOMASK ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_nomask.cpp)
 set(VARINT_HWY_RISCV_MUL_ADD ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_mul_add.cpp)
 set(VARINT_ARM_SVE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_sve.c)
@@ -64,8 +66,10 @@ if(BUILD_TEST)
             ${TEST_CPP}
             ${VARINT_RVV_ENCODE_C}
             ${VARINT_HWY_PORTABLE}
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
             ${VARINT_HWY_RISCV}
+            ${VARINT_HWY_RISCV_WMACCLIB}
             ${VARINT_RVV_VECSHIFT_C})
         target_link_libraries(test_varint_hwy varinthwyportable -static)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
@@ -75,6 +79,7 @@ if(BUILD_TEST)
             ${TEST_CPP}
             ${VARINT_RVV_ENCODE_C} 
             ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
             ${VARINT_ARM_SVE}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
@@ -85,6 +90,7 @@ if(BUILD_TEST)
             ${TEST_CPP} 
             ${VARINT_RVV_ENCODE_C} 
             ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
         )
         target_link_libraries(test_varint_hwy -static)
@@ -106,8 +112,10 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_VECSHIFT_C}
             ${VARINT_HWY_PORTABLE}
             ${VARINT_HWY_PORTABLE_NOMASK}
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
             ${VARINT_HWY_RISCV}
+            ${VARINT_HWY_RISCV_WMACCLIB}
             ${VARINT_HWY_RISCV_NOMASK}
             ${VARINT_HWY_RISCV_MUL_ADD}
             ${VARINT_RVV_SCALAR_TAIL_C}
@@ -122,6 +130,7 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_SCALAR_C} 
             ${VARINT_HWY_PORTABLE} 
             ${VARINT_HWY_PORTABLE_NOMASK}
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
             ${VARINT_ARM_SVE} 
             ${VARINT_ARM_SVE_EARLY_BRANCH} 
@@ -135,6 +144,7 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_SCALAR_C} 
             ${VARINT_HWY_PORTABLE} 
             ${VARINT_HWY_PORTABLE_NOMASK}
+            ${VARINT_HWY_PORTABLE_WMACCLIB}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
             ${VARINT_RVV_SCALAR_TAIL_C}
         )
