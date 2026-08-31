@@ -45,6 +45,7 @@ set(VARINT_RVV_SCALAR_C ${CMAKE_SOURCE_DIR}/submodules/varint_rvv/lib/src/varint
 set(VARINT_RVV_VECSHIFT_C ${CMAKE_SOURCE_DIR}/submodules/varint_rvv/lib/src/varint_decode_vecshift.c)
 set(VARINT_RVV_SCALAR_TAIL_C ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_scalar_tail.c)
 set(VARINT_HWY_PORTABLE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable.cpp)
+set(VARINT_HWY_PORTABLE_NOMASK ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_nomask.cpp)
 set(VARINT_HWY_PORTABLE_EARLY_BRANCH ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_early_branch.cpp)
 set(VARINT_HWY_RISCV ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv.cpp)
 set(VARINT_HWY_RISCV_NOMASK ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_nomask.cpp)
@@ -104,6 +105,7 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_SCALAR_C}
             ${VARINT_RVV_VECSHIFT_C}
             ${VARINT_HWY_PORTABLE}
+            ${VARINT_HWY_PORTABLE_NOMASK}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
             ${VARINT_HWY_RISCV}
             ${VARINT_HWY_RISCV_NOMASK}
@@ -119,6 +121,7 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_ENCODE_C} 
             ${VARINT_RVV_SCALAR_C} 
             ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_NOMASK}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
             ${VARINT_ARM_SVE} 
             ${VARINT_ARM_SVE_EARLY_BRANCH} 
@@ -131,6 +134,7 @@ if(BUILD_BENCHMARK)
             ${VARINT_RVV_ENCODE_C} 
             ${VARINT_RVV_SCALAR_C} 
             ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_NOMASK}
             ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
             ${VARINT_RVV_SCALAR_TAIL_C}
         )
