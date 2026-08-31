@@ -47,6 +47,7 @@ set(VARINT_RVV_SCALAR_TAIL_C ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_scalar_ta
 set(VARINT_HWY_PORTABLE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable.cpp)
 set(VARINT_HWY_PORTABLE_EARLY_BRANCH ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_portable_early_branch.cpp)
 set(VARINT_HWY_RISCV ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv.cpp)
+set(VARINT_HWY_RISCV_NOMASK ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_nomask.cpp)
 set(VARINT_HWY_RISCV_MUL_ADD ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_hwy_riscv_mul_add.cpp)
 set(VARINT_ARM_SVE ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_sve.c)
 set(VARINT_ARM_SVE_EARLY_BRANCH ${CMAKE_SOURCE_DIR}/lib/src/varint_decode_sve_early_branch.c)
@@ -58,15 +59,33 @@ if(BUILD_TEST)
     add_library(varinthwyportable STATIC ${VARINT_HWY_PORTABLE})
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
         add_library(varinthwyriscv STATIC ${VARINT_HWY_RISCV})
-        add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH} ${VARINT_HWY_RISCV} ${VARINT_RVV_VECSHIFT_C})
+        add_executable(test_varint_hwy
+            ${TEST_CPP}
+            ${VARINT_RVV_ENCODE_C}
+            ${VARINT_HWY_PORTABLE}
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
+            ${VARINT_HWY_RISCV}
+            ${VARINT_RVV_VECSHIFT_C})
         target_link_libraries(test_varint_hwy varinthwyportable -static)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
         add_library(varintarmsve STATIC ${VARINT_ARM_SVE})
         add_library(varintarmsveearlybranch STATIC ${VARINT_ARM_SVE_EARLY_BRANCH})
-        add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH} ${VARINT_ARM_SVE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH})
+        add_executable(test_varint_hwy 
+            ${TEST_CPP}
+            ${VARINT_RVV_ENCODE_C} 
+            ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
+            ${VARINT_ARM_SVE}
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
+        )
         target_link_libraries(test_varint_hwy varintarmsve varintarmsveearlybranch -static)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-        add_executable(test_varint_hwy ${TEST_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH})
+        add_executable(test_varint_hwy 
+            ${TEST_CPP} 
+            ${VARINT_RVV_ENCODE_C} 
+            ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
+        )
         target_link_libraries(test_varint_hwy -static)
     endif()
     target_include_directories(
@@ -79,15 +98,42 @@ if(BUILD_BENCHMARK)
     add_library(varinthwyportable STATIC ${VARINT_HWY_PORTABLE})
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
         add_library(varinthwyriscv STATIC ${VARINT_HWY_RISCV})
-        add_executable(benchmark_varint ${BENCHMARK_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_RVV_SCALAR_C} ${VARINT_RVV_VECSHIFT_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH} ${VARINT_HWY_RISCV} ${VARINT_HWY_RISCV_MUL_ADD} ${VARINT_RVV_SCALAR_TAIL_C})
+        add_executable(benchmark_varint
+            ${BENCHMARK_CPP}
+            ${VARINT_RVV_ENCODE_C}
+            ${VARINT_RVV_SCALAR_C}
+            ${VARINT_RVV_VECSHIFT_C}
+            ${VARINT_HWY_PORTABLE}
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH}
+            ${VARINT_HWY_RISCV}
+            ${VARINT_HWY_RISCV_NOMASK}
+            ${VARINT_HWY_RISCV_MUL_ADD}
+            ${VARINT_RVV_SCALAR_TAIL_C}
+        )
         target_link_libraries(benchmark_varint varinthwyportable benchmark -static)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
         add_library(varintarmsve STATIC ${VARINT_ARM_SVE})
         add_library(varintarmsveearlybranch STATIC ${VARINT_ARM_SVE_EARLY_BRANCH})
-        add_executable(benchmark_varint ${BENCHMARK_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_RVV_SCALAR_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH} ${VARINT_ARM_SVE} ${VARINT_ARM_SVE_EARLY_BRANCH} ${VARINT_RVV_SCALAR_TAIL_C})
+        add_executable(benchmark_varint 
+            ${BENCHMARK_CPP} 
+            ${VARINT_RVV_ENCODE_C} 
+            ${VARINT_RVV_SCALAR_C} 
+            ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
+            ${VARINT_ARM_SVE} 
+            ${VARINT_ARM_SVE_EARLY_BRANCH} 
+            ${VARINT_RVV_SCALAR_TAIL_C}
+        )
         target_link_libraries(benchmark_varint varintarmsve varintarmsveearlybranch benchmark -static)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-        add_executable(benchmark_varint ${BENCHMARK_CPP} ${VARINT_RVV_ENCODE_C} ${VARINT_RVV_SCALAR_C} ${VARINT_HWY_PORTABLE} ${VARINT_HWY_PORTABLE_EARLY_BRANCH} ${VARINT_RVV_SCALAR_TAIL_C})
+        add_executable(benchmark_varint 
+            ${BENCHMARK_CPP} 
+            ${VARINT_RVV_ENCODE_C} 
+            ${VARINT_RVV_SCALAR_C} 
+            ${VARINT_HWY_PORTABLE} 
+            ${VARINT_HWY_PORTABLE_EARLY_BRANCH} 
+            ${VARINT_RVV_SCALAR_TAIL_C}
+        )
         target_link_libraries(benchmark_varint benchmark -static)
     endif()
     target_include_directories(
