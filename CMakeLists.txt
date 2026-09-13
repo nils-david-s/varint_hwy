@@ -23,4 +23,4 @@ add_subdirectory(submodules/highway)
 add_subdirectory(decode)
 add_subdirectory(benchmark)
 add_subdirectory(test)
-
+add_subdirectory(highway_examples)
