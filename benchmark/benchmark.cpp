@@ -8,22 +8,32 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-extern "C" {
-    size_t vbyte_encode(const uint32_t *in, size_t length, uint8_t *bout);
-    size_t varint_decode_scalar(const uint8_t *input, size_t length, uint32_t *output);
-    size_t varint_decode_scalar_tail(const uint8_t *input, size_t length, uint32_t *output);
-    size_t varint_decode_vecshift(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_portable(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_portable_nomask(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_portable_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_portable_early_branch(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_riscv(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_riscv_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_riscv_nomask(const uint8_t *input, size_t length, uint32_t *output);
-    size_t call_varint_decode_hwy_riscv_mul_add(const uint8_t *input, size_t length, uint32_t *output);
-    size_t varint_decode_arm(const uint8_t *input, size_t length, uint32_t *output);
-    size_t varint_decode_arm_early_branch(const uint8_t *input, size_t length, uint32_t *output);
-}
+#include <varint_hwy_portable.h>
+#include <varint_scalar.h>
+#include <varint_encode.h>
+#if defined(RISCV)
+#include <varint_hwy_riscv.h>
+#include <varint_decode_vecshift.h>
+#elif defined(SVE2)
+#include <varint_arm.h>
+#endif
+
+//extern "C" {
+//    size_t vbyte_encode(const uint32_t *in, size_t length, uint8_t *bout);
+//    size_t varint_decode_scalar(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t varint_decode_scalar_tail(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t varint_decode_vecshift(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_portable(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_portable_nomask(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_portable_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_portable_early_branch(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_riscv(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_riscv_wmacclib(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_riscv_nomask(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t call_varint_decode_hwy_riscv_mul_add(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t varint_decode_arm(const uint8_t *input, size_t length, uint32_t *output);
+//    size_t varint_decode_arm_early_branch(const uint8_t *input, size_t length, uint32_t *output);
+//}
 
 struct Dataset {
     std::vector<uint8_t> input;
@@ -222,11 +232,8 @@ static void BM(benchmark::State &state) {
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-<<<<<<< HEAD
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-=======
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
->>>>>>> 75be8c8 (added libary provided widenmulaccumulate version for riscv and portable)
 BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
 #if defined(RISCV)
 BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);

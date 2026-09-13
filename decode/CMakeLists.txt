@@ -1,0 +1,6 @@
+add_subdirectory(portable)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
+    add_subdirectory(riscv)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    add_subdirectory(arm)
+endif()

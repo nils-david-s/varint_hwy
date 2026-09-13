@@ -8,12 +8,14 @@ build() {
     local name="$1"
     local tc="$2"
     local builddir="${ROOT_DIR}/out/build-${name}"
-    rm -rf "${builddir}"
-    mkdir -p "${builddir}"
-    pushd "${builddir}" > /dev/null
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=ON -DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/${tc}" "${ROOT_DIR}"
-    cmake --build . -- -j$(nproc)
-    popd > /dev/null
+    cmake \
+        -S "${ROOT_DIR}" \
+        -B "${builddir}" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/${tc}" "${ROOT_DIR}"
+    cmake \
+        --build "${builddir}" \
+        -- -j$(nproc)
 }
 
 build riscv toolchain-riscv.cmake

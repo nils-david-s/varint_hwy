@@ -1,5 +1,15 @@
-#include "libvarinthwy.h"
 #include "hwy/highway.h"
+
+#include <varint_hwy_portable.h>
+#include <varint_scalar.h>
+#include <varint_encode.h>
+#if defined(RISCV)
+#include <varint_hwy_riscv.h>
+#include <varint_decode_vecshift.h>
+#elif defined(SVE2)
+#include <varint_arm.h>
+#endif
+
 #if HWY_ONCE
 typedef struct
 {
@@ -76,16 +86,50 @@ static size_t get_varint_length(const uint8_t *p, const uint8_t *end)
     }
     return len;
 }
+using Decoder = size_t (*)(const uint8_t*, size_t, uint32_t*);
+
+bool test_decoder(uint8_t *encoded_data, size_t encoded_length, uint32_t *original_data, size_t original_count, const char* name, Decoder decoder) {
+    printf("--------------------------------\nBEGIN: TEST: %s \n", name);
+    size_t N = original_count;
+    uint32_t *decoded_data = (uint32_t*) malloc(N * sizeof(uint32_t));
+    size_t decoded_count;
+    if (!decoded_data) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        return 1;
+    }
+    decoded_count = decoder(encoded_data, encoded_length, decoded_data);
+    printf("%s: Decoded %zu intergers from %zu bytes\n\n", name, decoded_count, encoded_length);
+    // Validate
+    int errors = 0;
+    for (size_t i = 0; i < N; ++i) {
+        if (original_data[i] != decoded_data[i]) {
+            printf("%s: ERROR at index %zu: expected: %u, got %u\n", name, i, original_data[i], decoded_data[i]);
+            errors++;
+            if (errors >= 10) {
+                printf("%s: ... stopping after 10 erors)\n", name);
+                break;
+            }
+        }
+    }
+    free(decoded_data); 
+    if (errors == 0) {
+        printf("Portable: SUCCESS: All %zu values decoded correctly\n", N);
+        printf("END: TEST: %s \n--------------------------------\n", name);
+        return true;
+    } else {
+        printf("Portable: Failed: %d errors found\n", errors);
+        printf("END: TEST: %s \n--------------------------------\n", name);
+        return false;
+    }
+}
 int main(void) {
     const size_t N = 1567; // amount of numbers to generate
     const int weights[5] = {85, 5, 4, 3, 3};
-
     uint8_t *encoded_data = (uint8_t*) malloc(N * 5);
-    uint32_t *decoded_data_portable = (uint32_t*) malloc(N * sizeof(uint32_t));
-    uint32_t *decoded_data_specific = (uint32_t*) malloc(N * sizeof(uint32_t));
     uint32_t *original_data = (uint32_t*) malloc(N * sizeof(uint32_t));
-    size_t decoded_count_portable;
-    if (!original_data | !decoded_data_portable | !decoded_data_specific | !encoded_data) {
+    bool success = true;
+
+    if (!original_data | !encoded_data) {
         fprintf(stderr, "Failed to allocate memory\n");
         return 1;
     }
@@ -127,57 +171,10 @@ int main(void) {
     }
     printf("\n");
 
-    // Decode using varint_decode_hwy_portable (available on all architectures)
-    decoded_count_portable = call_varint_decode_hwy_portable(encoded_data, encoded_length, decoded_data_portable);
-    printf("Portable: Decoded %zu intergers from %zu bytes\n\n", decoded_count_portable, encoded_length);
-    // Validate portable
-    int errors_portable = 0;
-    for (size_t i = 0; i < N; ++i) {
-        if (original_data[i] != decoded_data_portable[i]) {
-            printf("Portable: ERROR at index %zu: expected: %u, got %u\n", i, original_data[i], decoded_data_portable[i]);
-            errors_portable++;
-            if (errors_portable >= 10) {
-                printf("Portable: ... stopping after 10 erors)\n");
-                break;
-            }
-        }
-    }
-    if (errors_portable == 0) {
-        printf("Portable: SUCCESS: All %zu values decoded correctly\n", N);
-    } else {
-        printf("Portable: Failed: %d errors found\n", errors_portable);
-    }
-    
-    // Decode using varint_decode_hwy_riscv or arm_sve implementation
-    #if defined(RISCV)
-    size_t decoded_count_specific;
-    decoded_count_specific = call_varint_decode_hwy_riscv(encoded_data, encoded_length, decoded_data_specific);
-    printf("\n\nSpecific(RISCV): Decoded %zu intergers from %zu bytes\n\n", decoded_count_specific, encoded_length);
-    #elif defined(SVE2)
-    size_t decoded_count_specific;
-    decoded_count_specific = varint_decode_arm(encoded_data, encoded_length, decoded_data_specific);
-    printf("\n\nSpecific(SVE2): Decoded %zu intergers from %zu bytes\n\n", decoded_count_specific, encoded_length);
-    #endif
-    // Validate varint_decode_hwy_riscv or arm_sve
-    #if defined(RISCV) || defined(SVE2) 
-    int errors_specific = 0;
-    for (size_t i = 0; i < N; ++i) {
-        if (original_data[i] != decoded_data_specific[i]) {
-            printf("RISCV/SVE2: ERROR at index %zu: expected: %u, got %u\n", i, original_data[i], decoded_data_specific[i]);
-            errors_specific++;
-            if (errors_specific >= 10) {
-                printf("RISCV/SVE2: ... stopping after 10 erors)\n");
-                break;
-            }
-        }
-    }
-    if (errors_specific == 0) {
-        printf("RISCV/SVE2: SUCCESS: All %zu values decoded correctly\n", N);
-    } else {
-        printf("RISCV/SVE2: Failed: %d errors found\n", errors_specific);
-    }
-    return errors_portable + errors_specific > 0 ? 1 : 0;
-    #endif
+    success &= test_decoder(encoded_data, encoded_length, original_data, N, "scalar_tail", varint_decode_scalar_tail);
+    success &= test_decoder(encoded_data, encoded_length, original_data, N, "scalar", varint_decode_scalar);
+    success &= test_decoder(encoded_data, encoded_length, original_data, N, "Highway portable", call_varint_decode_hwy_portable);
+
+    return success ? 0 : 1;
 }
 #endif // HWY_ONCE
-
