@@ -11,7 +11,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     target_link_libraries(test_varint PRIVATE
         varint_arm
     )
-elseif(TRUE)
+else()
     add_subdirectory(x86_64)
 endif()
 
