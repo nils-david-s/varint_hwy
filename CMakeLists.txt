@@ -11,6 +11,17 @@ set(HWY_ENABLE_CONTRIB OFF CACHE BOOL "Include contrib/")
 set(HWY_ENABLE_EXAMPLES OFF CACHE BOOL "Build examples")
 set(HWY_ENABLE_TESTS OFF CACHE BOOL "Enable HWY tests")
 
+set(OPT_LEVEL "O3" CACHE STRING "Optimization level")
+add_compile_options(
+    -${OPT_LEVEL}
+    -Wall
+    -Werror
+)
+
+add_link_options(
+    -static
+)
+
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
     add_compile_definitions(RISCV)
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")

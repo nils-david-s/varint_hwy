@@ -11,8 +11,8 @@ build() {
     cmake \
         -S "${ROOT_DIR}" \
         -B "${builddir}" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/${tc}" "${ROOT_DIR}"
+        -DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/toolchains/${tc}" \
+        -DOPT_LEVEL="O3"
     cmake \
         --build "${builddir}" \
         -- -j$(nproc)
