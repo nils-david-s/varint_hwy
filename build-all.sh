@@ -12,6 +12,7 @@ build() {
         -S "${ROOT_DIR}" \
         -B "${builddir}" \
         -DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/toolchains/${tc}" \
+        -DCMAKE_BUILD_TYPE=Release \
         -DOPT_LEVEL="O3"
     cmake \
         --build "${builddir}" \
