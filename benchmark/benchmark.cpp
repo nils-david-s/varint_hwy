@@ -100,9 +100,15 @@ static Dataset make_dataset(size_t num_values, uint32_t seed,
     return ds;
 }
 
+struct PerfRead {
+    uint64_t value;
+    uint64_t time_enabled;
+    uint64_t time_running;
+};
+
 class PerfCounter {
     public:
-        PerfCounter(uint64_t event_type, uint64_t event_config) {
+        PerfCounter(uint64_t event_type, uint64_t event_config, int group_fd = -1) {
             struct perf_event_attr pe = {};
             pe.type = event_type;
             pe.size = sizeof(pe);
@@ -110,8 +116,10 @@ class PerfCounter {
             pe.disabled = 1;
             pe.exclude_kernel = 1;
             pe.exclude_hv = 1;
+            pe.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED |
+                PERF_FORMAT_TOTAL_TIME_RUNNING;
 
-            fd_ = syscall(SYS_perf_event_open, &pe, 0, -1, -1, 0);
+            fd_ = syscall(SYS_perf_event_open, &pe, 0, -1, group_fd, 0);
         }
 
         ~PerfCounter() {
@@ -120,296 +128,337 @@ class PerfCounter {
             }
         }
 
+        int fd() const {
+            return fd_;
+        }
         bool valid() const { return fd_ >= 0; }
 
-        void start() {
-            if (fd_ >= 0) {
-                ioctl(fd_, PERF_EVENT_IOC_RESET, 0);
-                ioctl(fd_, PERF_EVENT_IOC_ENABLE, 0);
+        double read_scaled() {
+            PerfRead result{};
+            if (fd_ < 0) {
+                return 0.0;
+            }
+            const ssize_t bytes_read = read(fd_, &result, sizeof(result));
+            if (bytes_read != sizeof(result) || result.time_running == 0) {
+                return -1.0;
+            }
+            return static_cast<double>(result.value) * 
+                    static_cast<double>(result.time_enabled) / 
+                    static_cast<double>(result.time_running);
+        }
+
+        void start_group() {
+            if (fd_ >=0) {
+                ioctl(fd_, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
+                ioctl(fd_, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP);
             }
         }
 
-        uint64_t stop() {
-            uint64_t count = 0;
+        void stop_group() {
             if (fd_ >= 0) {
-                ioctl(fd_, PERF_EVENT_IOC_DISABLE, 0);
-                const ssize_t bytes_read = read(fd_, &count, sizeof(count));
-                if (bytes_read != static_cast<ssize_t>(sizeof(count))) {
-                    count = 0;
-                }
+                ioctl(fd_, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP);
             }
-            return count;
         }
+
 
     private:
         int fd_ = -1;
 };
 
-template <auto DecoderFn, int P1, int P2, int P3, int P4, int P5>
+enum class CounterGroup {
+    Core,
+    Cache,
+    Stalls,
+};
+
+template <auto DecoderFn, int P1, int P2, int P3, int P4, int P5, CounterGroup Group>
 static void BM(benchmark::State &state) {
     const size_t num_values = static_cast<size_t>(state.range(0));
     auto ds = make_dataset(num_values, 12345, P1, P2, P3, P4, P5);
 
     size_t total_ints = 0;
-    uint64_t total_instructions = 0;
-    uint64_t total_cycles = 0;
-    uint64_t total_branches = 0;
-    uint64_t total_branch_misses = 0;
-    uint64_t total_stalled_frontend = 0;
-    uint64_t total_stalled_backend = 0;
-    uint64_t total_cache_misses_l1i = 0;
-    uint64_t total_cache_misses_l1d = 0;
-    uint64_t total_cache_misses_ll = 0;
 
-    PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
-    PerfCounter cycle_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
-    PerfCounter branch_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS);
-    PerfCounter branch_misses(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
-    PerfCounter stalled_frontend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND);
-    PerfCounter stalled_backend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND);
-    PerfCounter cache_misses_l1i(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I
-                                | (PERF_COUNT_HW_CACHE_OP_READ << 8)
-                                | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
-    PerfCounter cache_misses_l1d(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D
-                                | (PERF_COUNT_HW_CACHE_OP_READ << 8)
-                                | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
-    PerfCounter cache_misses_ll(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL 
-                              | (PERF_COUNT_HW_CACHE_OP_READ << 8) 
-                              | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
-    
+    auto run = [&] {
+        for (auto _ : state) {
+            size_t n = DecoderFn(ds.input.data(), ds.input.size(), ds.output.data());
+            total_ints += n;
 
-    insn_counter.start();
-    cycle_counter.start();
-    branch_counter.start();
-    branch_misses.start();
-    stalled_frontend_counter.start();
-    stalled_backend_counter.start();
-    cache_misses_l1i.start();
-    cache_misses_l1d.start();
-    cache_misses_ll.start();
-    for (auto _ : state) {
-        size_t n = DecoderFn(ds.input.data(), ds.input.size(), ds.output.data());
-        total_ints += n;
+            benchmark::DoNotOptimize(n);
+            benchmark::DoNotOptimize(ds.output.data());
+            benchmark::ClobberMemory();
+        }
+    };
 
-        benchmark::DoNotOptimize(n);
-        benchmark::DoNotOptimize(ds.output.data());
-        benchmark::ClobberMemory();
+    if constexpr (Group == CounterGroup::Core) {
+        PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
+        PerfCounter cycle_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, insn_counter.fd());
+        PerfCounter branch_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS, insn_counter.fd());
+        PerfCounter branch_misses(PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES, insn_counter.fd());
+
+        insn_counter.start_group();
+        run();
+        insn_counter.stop_group();
+
+        const auto total_instructions = insn_counter.read_scaled();
+        const auto total_cycles = cycle_counter.read_scaled();
+        const auto total_branches = branch_counter.read_scaled();
+        const auto total_branch_misses = branch_misses.read_scaled();
+        if (insn_counter.valid()) {
+            state.counters["insn/byte"] = benchmark::Counter(
+                total_instructions / double(ds.input.size() * state.iterations()),
+                benchmark::Counter::kAvgThreads);
+            state.counters["insn/int"] = benchmark::Counter(
+                total_instructions / double(total_ints),
+                benchmark::Counter::kAvgThreads);
+            state.counters["branchmissn/branchn"] = benchmark::Counter(
+                total_branch_misses / total_branches,
+                benchmark::Counter::kAvgThreads);
+        }
+
+
+        if (cycle_counter.valid() && total_cycles > 0) {
+            state.counters["bytes/cycle"] = benchmark::Counter(
+                double(ds.input.size() * state.iterations()) / total_cycles,
+                benchmark::Counter::kAvgThreads);
+        }
     }
-    total_instructions = insn_counter.stop();
-    total_cycles = cycle_counter.stop();
-    total_branches = branch_counter.stop();
-    total_branch_misses = branch_misses.stop();
-    total_stalled_frontend = stalled_frontend_counter.stop();
-    total_stalled_backend = stalled_backend_counter.stop();
-    total_cache_misses_l1i = cache_misses_l1i.stop();
-    total_cache_misses_l1d = cache_misses_l1d.stop();
-    total_cache_misses_ll = cache_misses_ll.stop();
+    else if constexpr (Group == CounterGroup::Cache) {
+        PerfCounter cache_misses_l1i(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I
+                                    | (PERF_COUNT_HW_CACHE_OP_READ << 8)
+                                    | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
+        PerfCounter cache_misses_l1d(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D
+                                    | (PERF_COUNT_HW_CACHE_OP_READ << 8)
+                                    | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
+                                    cache_misses_l1i.fd());
+        PerfCounter cache_misses_ll(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL 
+                                  | (PERF_COUNT_HW_CACHE_OP_READ << 8) 
+                                  | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
+                                  cache_misses_l1i.fd());
+        PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,
+                                  cache_misses_l1i.fd());
 
+        cache_misses_l1i.start_group();
+        run();
+        cache_misses_l1i.stop_group();
+
+        const auto total_cache_misses_l1i = cache_misses_l1i.read_scaled();
+        const auto total_cache_misses_l1d = cache_misses_l1d.read_scaled();
+        const auto total_cache_misses_ll = cache_misses_ll.read_scaled();
+        const auto total_instructions = insn_counter.read_scaled();
+
+        if (insn_counter.valid()) {
+            state.counters["chachemissl1in/insn"] = benchmark::Counter(
+                total_cache_misses_l1i / total_instructions,
+                benchmark::Counter::kAvgThreads);
+            state.counters["chachemissl1dn/insn"] = benchmark::Counter(
+                total_cache_misses_l1d / total_instructions,
+                benchmark::Counter::kAvgThreads);
+            state.counters["chachemissll/insn"] = benchmark::Counter(
+                total_cache_misses_ll / total_instructions,
+                benchmark::Counter::kAvgThreads);
+        }
+    }
+    else if constexpr(Group == CounterGroup::Stalls) {
+        PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
+        PerfCounter stalled_frontend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, insn_counter.fd());
+        PerfCounter stalled_backend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND, insn_counter.fd());
+
+        insn_counter.start_group();
+        run();
+        insn_counter.stop_group();
+
+        const auto total_instructions = insn_counter.read_scaled();
+        const auto total_stalled_frontend = stalled_frontend_counter.read_scaled();
+        const auto total_stalled_backend = stalled_backend_counter.read_scaled();
+
+        if (insn_counter.valid()) {
+            state.counters["stallfrontendn/insn"] = benchmark::Counter(
+                total_stalled_frontend / total_instructions,
+                benchmark::Counter::kAvgThreads);
+            state.counters["stallbackendn/insn"] = benchmark::Counter(
+                total_stalled_backend / total_instructions,
+                benchmark::Counter::kAvgThreads);
+        }
+    }
     state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(ds.input.size()));
-    // state.SetItemsProcessed(int64_t(total_ints));
-
-    if (insn_counter.valid()) {
-        state.counters["insn/byte"] = benchmark::Counter(
-            double(total_instructions) / double(ds.input.size() * state.iterations()),
-            benchmark::Counter::kAvgThreads);
-        state.counters["insn/int"] = benchmark::Counter(
-            double(total_instructions) / double(total_ints),
-            benchmark::Counter::kAvgThreads);
-        state.counters["chachemissl1in/insn"] = benchmark::Counter(
-            double(total_cache_misses_l1i) / double(total_instructions),
-            benchmark::Counter::kAvgThreads);
-        state.counters["chachemissl1dn/insn"] = benchmark::Counter(
-            double(total_cache_misses_l1d) / double(total_instructions),
-            benchmark::Counter::kAvgThreads);
-        state.counters["chachemissll/insn"] = benchmark::Counter(
-            double(total_cache_misses_ll) / double(total_instructions),
-            benchmark::Counter::kAvgThreads);
-        state.counters["branchmissn/branchn"] = benchmark::Counter(
-            double(total_branch_misses) / double(total_branches),
-            benchmark::Counter::kAvgThreads);
-        state.counters["stallfrontendn/insn"] = benchmark::Counter(
-            double(total_stalled_frontend) / double(total_instructions),
-            benchmark::Counter::kAvgThreads);
-        state.counters["stallbackendn/insn"] = benchmark::Counter(
-            double(total_stalled_backend) / double(total_instructions),
-            benchmark::Counter::kAvgThreads);
-    }
-
-    if (cycle_counter.valid() && total_cycles > 0) {
-        state.counters["bytes/cycle"] = benchmark::Counter(
-            double(ds.input.size() * state.iterations()) / double(total_cycles),
-            benchmark::Counter::kAvgThreads);
-    }
 }
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+#define REGISTER_BM(FN, P1, P2, P3, P4, P5) \
+    BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Core) \
+        ->RangeMultiplier(2)->Range(1 << 8, 1 << 22); \
+    BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Cache) \
+        ->RangeMultiplier(2)->Range(1 << 8, 1 << 22); \
+    BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) \
+        ->RangeMultiplier(2)->Range(1 << 8, 1 << 22); 
+
+REGISTER_BM(varint_decode_scalar,                            95,  2, 1, 1, 1)
+REGISTER_BM(varint_decode_scalar_tail,                       95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_portable,                 95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,          95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    95,  2, 1, 1, 1)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                          95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv,                    95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,           95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,             95,  2, 1, 1, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,            95,  2, 1, 1, 1)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               95,  2, 1, 1, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                               95,  2, 1, 1, 1)
+REGISTER_BM(varint_decode_arm_early_branch,                  95,  2, 1, 1, 1)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                            90,  4, 3, 2, 1)
+REGISTER_BM(varint_decode_scalar_tail,                       90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_portable,                 90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,          90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    90,  4, 3, 2, 1)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                          90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv,                    90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,           90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,             90,  4, 3, 2, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,            90,  4, 3, 2, 1)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               90,  4, 3, 2, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                               90,  4, 3, 2, 1)
+REGISTER_BM(varint_decode_arm_early_branch,                  90,  4, 3, 2, 1)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                            81,  7, 6, 5, 1)
+REGISTER_BM(varint_decode_scalar_tail,                       81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable,                 81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,          81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    81,  7, 6, 5, 1)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                          81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv,                    81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,           81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,             81,  7, 6, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,            81,  7, 6, 5, 1)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               81,  7, 6, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                               81,  7, 6, 5, 1)
+REGISTER_BM(varint_decode_arm_early_branch,                  81,  7, 6, 5, 1)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                            72, 13, 9, 5, 1)
+REGISTER_BM(varint_decode_scalar_tail,                       72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable,                 72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,          72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    72, 13, 9, 5, 1)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                          72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv,                    72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,           72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,             72, 13, 9, 5, 1)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,            72, 13, 9, 5, 1)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               72, 13, 9, 5, 1)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                               72, 13, 9, 5, 1)
+REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                           100,  0,  0, 0, 0)
+REGISTER_BM(varint_decode_scalar_tail,                      100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable,                100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,         100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,       100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,   100,  0,  0, 0, 0)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                         100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv,                   100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,          100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,            100,  0,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,           100,  0,  0, 0, 0)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               100,0,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                              100,  0,  0, 0, 0)
+REGISTER_BM(varint_decode_arm_early_branch,                 100,  0,  0, 0, 0)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                             0, 100,  0, 0, 0)
+REGISTER_BM(varint_decode_scalar_tail,                        0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable,                  0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0, 100,  0, 0, 0)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                           0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv,                     0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,            0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,              0, 100,  0, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,             0, 100,  0, 0, 0)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               0,100,0,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                                0, 100,  0, 0, 0)
+REGISTER_BM(varint_decode_arm_early_branch,                   0, 100,  0, 0, 0)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                             0,  0, 100, 0, 0)
+REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 100, 0, 0)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                           0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,            0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,              0,  0, 100, 0, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,             0,  0, 100, 0, 0)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               0,0,100,0,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                                0,  0, 100, 0, 0)
+REGISTER_BM(varint_decode_arm_early_branch,                   0,  0, 100, 0, 0)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                             0,  0, 0, 100, 0)
+REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 100, 0)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                           0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,            0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,              0,  0, 0, 100, 0)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,             0,  0, 0, 100, 0)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               0,0,0,100,0)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                                0,  0, 0, 100, 0)
+REGISTER_BM(varint_decode_arm_early_branch,                   0,  0, 0, 100, 0)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                             0,  0, 0, 0, 100)
+REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 0, 100)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                           0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,            0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,              0,  0, 0, 0, 100)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,             0,  0, 0, 0, 100)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               0,0,0,0,100)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                                0,  0, 0, 0, 100)
+REGISTER_BM(varint_decode_arm_early_branch,                   0,  0, 0, 0, 100)
 #endif
 
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar,            20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_scalar_tail,            20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_nomask, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_wmacclib, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_portable_early_branch, 20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_scalar,                            20, 20, 20, 20, 20)
+REGISTER_BM(varint_decode_scalar_tail,                       20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_portable,                 20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_portable_nomask,          20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    20, 20, 20, 20, 20)
 #if defined(RISCV)
-BENCHMARK_TEMPLATE(BM, varint_decode_vecshift,          20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_wmacclib,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_nomask,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, call_varint_decode_hwy_riscv_mul_add,    20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_vecshift,                          20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_riscv,                    20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_riscv_wmacclib,           20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_riscv_nomask,             20, 20, 20, 20, 20)
+REGISTER_BM(call_varint_decode_hwy_riscv_mul_add,            20, 20, 20, 20, 20)
 #elif defined(SVE2)
-BENCHMARK_TEMPLATE(BM, varint_decode_arm,               20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
-BENCHMARK_TEMPLATE(BM, varint_decode_arm_early_branch,               20,20,20,20,20)->RangeMultiplier(2)->Range(1 << 8, 1 << 20);
+REGISTER_BM(varint_decode_arm,                               20, 20, 20, 20, 20)
+REGISTER_BM(varint_decode_arm_early_branch,                  20, 20, 20, 20, 20)
 #endif
 
 BENCHMARK_MAIN();
