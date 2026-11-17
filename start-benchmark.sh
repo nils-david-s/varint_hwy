@@ -30,7 +30,7 @@ echo "$CPU minimum frequency set to ${MAX}"
 taskset -c 2 "$BENCHMARK" \
     --benchmark_min_warmup_time=0.5 \
     --benchmark_min_time=2s \
-    --benchmark_repetitions=5 \
+    --benchmark_repetitions=3 \
     --benchmark_out=benchmark_result.json \
     --benchmark_out_format=json \
     --benchmark_report_aggregates_only=true
