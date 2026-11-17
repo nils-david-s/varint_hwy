@@ -27,9 +27,9 @@ echo "$MAX" | sudo tee "$CPUFREQ/scaling_min_freq"
 
 echo "$CPU minimum frequency set to ${MAX}"
 
-taskset -c 2 "BENCHMARK" \
+taskset -c 2 "$BENCHMARK" \
     --benchmark_min_warmup_time=0.5 \
-    --benchmark_min_time=2 \
+    --benchmark_min_time=2s \
     --benchmark_repetitions=5 \
     --benchmark_out=benchmark_result.csv \
     --benchmark_out_format=csv \
