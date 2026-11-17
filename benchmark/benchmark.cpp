@@ -123,14 +123,28 @@ class PerfCounter {
                 return 0.0;
             }
             const ssize_t bytes_read = read(fd_, &result, sizeof(result));
-            if (bytes_read != sizeof(result) || result.time_running == 0) {
+            if (bytes_read != sizeof(result) || result.time_running == 0 || result.time_enabled == 0) {
                 return -1.0;
             }
             return static_cast<double>(result.value) * 
                     static_cast<double>(result.time_enabled) / 
                     static_cast<double>(result.time_running);
+            
         }
 
+        void debug_read(const char* name) {
+            PerfRead result{};
+            const ssize_t n = read(fd_, &result, sizeof(result));
+
+            if (n != sizeof(result)) {
+                perror(name);
+                return;
+            }
+
+            printf("%s: value=%lu enabled=%lu running=%lu\n",
+                   name, result.value,
+                   result.time_enabled, result.time_running);
+        }
         void start_group() {
             if (fd_ >=0) {
                 ioctl(fd_, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
@@ -207,28 +221,33 @@ static void BM(benchmark::State &state) {
         }
     }
     else if constexpr (Group == CounterGroup::Cache) {
+        PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
         PerfCounter cache_misses_l1i(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I
                                     | (PERF_COUNT_HW_CACHE_OP_READ << 8)
-                                    | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16));
+                                    | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16), 
+                                    insn_counter.fd());
         PerfCounter cache_misses_l1d(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D
                                     | (PERF_COUNT_HW_CACHE_OP_READ << 8)
                                     | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-                                    cache_misses_l1i.fd());
-        PerfCounter cache_misses_ll(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL 
-                                  | (PERF_COUNT_HW_CACHE_OP_READ << 8) 
-                                  | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-                                  cache_misses_l1i.fd());
-        PerfCounter insn_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,
-                                  cache_misses_l1i.fd());
+                                    insn_counter.fd());
+        // Not supported on K1 board
+        //PerfCounter cache_misses_ll(PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL 
+        //                          | (PERF_COUNT_HW_CACHE_OP_READ << 8) 
+        //                          | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
+        //                          insn_counter.fd());
+        PerfCounter stalled_backend_counter(PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,
+                                    insn_counter.fd());
 
-        cache_misses_l1i.start_group();
+        insn_counter.start_group();
         run();
-        cache_misses_l1i.stop_group();
+        insn_counter.stop_group();
+
 
         const auto total_cache_misses_l1i = cache_misses_l1i.read_scaled();
         const auto total_cache_misses_l1d = cache_misses_l1d.read_scaled();
-        const auto total_cache_misses_ll = cache_misses_ll.read_scaled();
+        //const auto total_cache_misses_ll = cache_misses_ll.read_scaled();
         const auto total_instructions = insn_counter.read_scaled();
+        const auto total_stalled_backend = stalled_backend_counter.read_scaled();
 
         if (insn_counter.valid()) {
             state.counters["chachemissl1in/insn"] = benchmark::Counter(
@@ -237,8 +256,11 @@ static void BM(benchmark::State &state) {
             state.counters["chachemissl1dn/insn"] = benchmark::Counter(
                 total_cache_misses_l1d / total_instructions,
                 benchmark::Counter::kAvgThreads);
-            state.counters["chachemissll/insn"] = benchmark::Counter(
-                total_cache_misses_ll / total_instructions,
+            //state.counters["chachemissll/insn"] = benchmark::Counter(
+            //    total_cache_misses_ll / total_instructions,
+            //    benchmark::Counter::kAvgThreads);
+            state.counters["stallbackendn/insn"] = benchmark::Counter(
+                total_stalled_backend / total_instructions,
                 benchmark::Counter::kAvgThreads);
         }
     }
@@ -272,7 +294,7 @@ static void BM(benchmark::State &state) {
         ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); \
     BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Cache) \
         ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
-    //BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) \
+    // BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) 
     //    ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
 
 REGISTER_BM(varint_decode_scalar,                            95,  2, 1, 1, 1)
