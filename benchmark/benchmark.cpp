@@ -271,9 +271,9 @@ static void BM(benchmark::State &state) {
     BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Core) \
         ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); \
     BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Cache) \
-        ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); \
-    BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) \
         ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
+    //BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) \
+    //    ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
 
 REGISTER_BM(varint_decode_scalar,                            95,  2, 1, 1, 1)
 REGISTER_BM(varint_decode_scalar_tail,                       95,  2, 1, 1, 1)
