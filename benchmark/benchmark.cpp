@@ -291,18 +291,18 @@ static void BM(benchmark::State &state) {
 
 #define REGISTER_BM(FN, P1, P2, P3, P4, P5) \
     BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Core) \
-        ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); \
+        ->RangeMultiplier(2)->Range(1 << 8, 1 << 22); \
     BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Cache) \
-        ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
+        ->RangeMultiplier(2)->Range(1 << 8, 1 << 22); 
     // BENCHMARK_TEMPLATE(BM, FN, P1, P2, P3, P4, P5, CounterGroup::Stalls) 
     //    ->RangeMultiplier(2)->Range(1 << 8, 1 << 20); 
 
 REGISTER_BM(varint_decode_scalar,                            95,  2, 1, 1, 1)
-REGISTER_BM(varint_decode_scalar_tail,                       95,  2, 1, 1, 1)
+//REGISTER_BM(varint_decode_scalar_tail,                       95,  2, 1, 1, 1)
 REGISTER_BM(call_varint_decode_hwy_portable,                 95,  2, 1, 1, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_nomask,          95,  2, 1, 1, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        95,  2, 1, 1, 1)
-REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    95,  2, 1, 1, 1)
+//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    95,  2, 1, 1, 1)
 #if defined(RISCV)
 REGISTER_BM(varint_decode_vecshift,                          95,  2, 1, 1, 1)
 REGISTER_BM(call_varint_decode_hwy_riscv,                    95,  2, 1, 1, 1)
@@ -315,11 +315,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  95,  2, 1, 1, 1)
 #endif
 
 //REGISTER_BM(varint_decode_scalar,                            90,  4, 3, 2, 1)
-//REGISTER_BM(varint_decode_scalar_tail,                       90,  4, 3, 2, 1)
+////REGISTER_BM(varint_decode_scalar_tail,                       90,  4, 3, 2, 1)
 //REGISTER_BM(call_varint_decode_hwy_portable,                 90,  4, 3, 2, 1)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,          90,  4, 3, 2, 1)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        90,  4, 3, 2, 1)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    90,  4, 3, 2, 1)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    90,  4, 3, 2, 1)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                          90,  4, 3, 2, 1)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                    90,  4, 3, 2, 1)
@@ -332,11 +332,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  95,  2, 1, 1, 1)
 //#endif
 
 REGISTER_BM(varint_decode_scalar,                            81,  7, 6, 5, 1)
-REGISTER_BM(varint_decode_scalar_tail,                       81,  7, 6, 5, 1)
+//REGISTER_BM(varint_decode_scalar_tail,                       81,  7, 6, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable,                 81,  7, 6, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_nomask,          81,  7, 6, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        81,  7, 6, 5, 1)
-REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    81,  7, 6, 5, 1)
+//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    81,  7, 6, 5, 1)
 #if defined(RISCV)
 REGISTER_BM(varint_decode_vecshift,                          81,  7, 6, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_riscv,                    81,  7, 6, 5, 1)
@@ -349,11 +349,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  81,  7, 6, 5, 1)
 #endif
 
 REGISTER_BM(varint_decode_scalar,                            72, 13, 9, 5, 1)
-REGISTER_BM(varint_decode_scalar_tail,                       72, 13, 9, 5, 1)
+//REGISTER_BM(varint_decode_scalar_tail,                       72, 13, 9, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable,                 72, 13, 9, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_nomask,          72, 13, 9, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        72, 13, 9, 5, 1)
-REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    72, 13, 9, 5, 1)
+//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    72, 13, 9, 5, 1)
 #if defined(RISCV)
 REGISTER_BM(varint_decode_vecshift,                          72, 13, 9, 5, 1)
 REGISTER_BM(call_varint_decode_hwy_riscv,                    72, 13, 9, 5, 1)
@@ -366,11 +366,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 #endif
 
 //REGISTER_BM(varint_decode_scalar,                           100,  0,  0, 0, 0)
-//REGISTER_BM(varint_decode_scalar_tail,                      100,  0,  0, 0, 0)
+////REGISTER_BM(varint_decode_scalar_tail,                      100,  0,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable,                100,  0,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,         100,  0,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,       100,  0,  0, 0, 0)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,   100,  0,  0, 0, 0)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,   100,  0,  0, 0, 0)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                         100,  0,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                   100,  0,  0, 0, 0)
@@ -383,11 +383,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 //#endif
 //
 //REGISTER_BM(varint_decode_scalar,                             0, 100,  0, 0, 0)
-//REGISTER_BM(varint_decode_scalar_tail,                        0, 100,  0, 0, 0)
+////REGISTER_BM(varint_decode_scalar_tail,                        0, 100,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable,                  0, 100,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0, 100,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0, 100,  0, 0, 0)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0, 100,  0, 0, 0)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0, 100,  0, 0, 0)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                           0, 100,  0, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                     0, 100,  0, 0, 0)
@@ -400,11 +400,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 //#endif
 //
 //REGISTER_BM(varint_decode_scalar,                             0,  0, 100, 0, 0)
-//REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 100, 0, 0)
+////REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 100, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 100, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 100, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 100, 0, 0)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 100, 0, 0)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 100, 0, 0)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                           0,  0, 100, 0, 0)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 100, 0, 0)
@@ -417,11 +417,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 //#endif
 //
 //REGISTER_BM(varint_decode_scalar,                             0,  0, 0, 100, 0)
-//REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 100, 0)
+////REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 100, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 0, 100, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 0, 100, 0)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 0, 100, 0)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 100, 0)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 100, 0)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                           0,  0, 0, 100, 0)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 0, 100, 0)
@@ -434,11 +434,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 //#endif
 //
 //REGISTER_BM(varint_decode_scalar,                             0,  0, 0, 0, 100)
-//REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 0, 100)
+////REGISTER_BM(varint_decode_scalar_tail,                        0,  0, 0, 0, 100)
 //REGISTER_BM(call_varint_decode_hwy_portable,                  0,  0, 0, 0, 100)
 //REGISTER_BM(call_varint_decode_hwy_portable_nomask,           0,  0, 0, 0, 100)
 //REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,         0,  0, 0, 0, 100)
-//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 0, 100)
+////REGISTER_BM(call_varint_decode_hwy_portable_early_branch,     0,  0, 0, 0, 100)
 //#if defined(RISCV)
 //REGISTER_BM(varint_decode_vecshift,                           0,  0, 0, 0, 100)
 //REGISTER_BM(call_varint_decode_hwy_riscv,                     0,  0, 0, 0, 100)
@@ -451,11 +451,11 @@ REGISTER_BM(varint_decode_arm_early_branch,                  72, 13, 9, 5, 1)
 //#endif
 
 REGISTER_BM(varint_decode_scalar,                            20, 20, 20, 20, 20)
-REGISTER_BM(varint_decode_scalar_tail,                       20, 20, 20, 20, 20)
+//REGISTER_BM(varint_decode_scalar_tail,                       20, 20, 20, 20, 20)
 REGISTER_BM(call_varint_decode_hwy_portable,                 20, 20, 20, 20, 20)
 REGISTER_BM(call_varint_decode_hwy_portable_nomask,          20, 20, 20, 20, 20)
 REGISTER_BM(call_varint_decode_hwy_portable_wmacclib,        20, 20, 20, 20, 20)
-REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    20, 20, 20, 20, 20)
+//REGISTER_BM(call_varint_decode_hwy_portable_early_branch,    20, 20, 20, 20, 20)
 #if defined(RISCV)
 REGISTER_BM(varint_decode_vecshift,                          20, 20, 20, 20, 20)
 REGISTER_BM(call_varint_decode_hwy_riscv,                    20, 20, 20, 20, 20)
